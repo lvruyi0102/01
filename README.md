@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>✨墨离的星辰点击球</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        /* 星空主题CSS */
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f0c29;
+            background: linear-gradient(to bottom, #0f0c29, #302b63);
+            color: #e6f7ff;
+            font-family: 'Arial Rounded MT Bold', sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ball {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff9a9e, #fad0c4);
+            box-shadow: 0 0 25px #ff9a9e80;
+            cursor: pointer;
+            transition: transform 0.1s;
+            z-index: 10;
+        }
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        #uiPanel {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 20;
+        }
+        #scoreDisplay {
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #a1c4fd;
+            margin-bottom: 10px;
+        }
+        #timeBar {
+            width: 80%;
+            height: 12px;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        #timeLeft {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+            transition: width 0.5s linear;
+        }
+        #rankDisplay {
+            font-size: 1.2em;
+            margin-top: 5px;
+            color: #c2e9fb;
+        }
+        #startPanel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15,12,41,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+        }
+        .btn {
+            padding: 15px 30px;
+            margin: 10px;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, #ff9a9e, #fad0c4);
+            color: #0f0c29;
+            font-size: 1.2em;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(255,154,158,0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        #gameTitle {
+            font-size: 2.8em;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #a1c4fd, #c2e9fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(161,196,253,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="uiPanel">
+            <div id="scoreDisplay">0</div>
+            <div id="timeBar"><div id="timeLeft"></div></div>
+            <div id="rankDisplay">等待开始...</div>
+        </div>
+        
+        <div id="ball"></div>
+        
+        <div id="startPanel">
+            <h1 id="gameTitle">✨星辰点击球</h1>
+            <button class="btn" id="startBtn">开始挑战</button>
+            <button class="btn" id="zenBtn">禅意模式</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏元素
+        const ball = document.getElementById('ball');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timeLeft = document.getElementById('timeLeft');
+        const rankDisplay = document.getElementById('rankDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const zenBtn = document.getElementById('zenBtn');
+        const startPanel = document.getElementById('startPanel');
+        const gameContainer = document.getElementById('gameContainer');
+
+        // 游戏变量
+        let score = 0;
+        let time = 30;
+        let gameTimer;
+        let countdown;
+        let isPlaying = false;
+        let zenMode = false;
+        let ballSpeed = 1;
+        let ballSize = 70;
+
+        // 段位系统
+        const ranks = [
+            { score: 0, name: "地球萌新", color: "#a1c4fd" },
+            { score: 20, name: "月球探险家", color: "#c2e9fb" },
+            { score: 50, name: "火星征服者", color: "#ff9a9e" },
+            { score: 80, name: "木星守护者", color: "#fbc2eb" },
+            { score: 120, name: "银河漫游者", color: "#ffecd2" },
+            { score: 200, name: "宇宙主宰", color: "#fcb69f" }
+        ];
+
+        // 初始化游戏
+        function initGame() {
+            score = 0;
+            time = zenMode ? 999 : 30;
+            ballSpeed = 1;
+            ballSize = 70;
+            
+            scoreDisplay.textContent = score;
+            timeLeft.style.width = '100%';
+            updateRank();
+            
+            ball.style.width = ballSize + 'px';
+            ball.style.height = ballSize + 'px';
+            ball.style.display = 'block';
+            moveBall();
+            
+            if (!zenMode) {
+                startTimer();
+            }
+        }
+
+        // 球球移动逻辑
+        function moveBall() {
+            if (!isPlaying) return;
+            
+            const containerWidth = gameContainer.offsetWidth;
+            const containerHeight = gameContainer.offsetHeight;
+            
+            // 随机新位置
+            const newX = Math.random() * (containerWidth - ballSize);
+            const newY = Math.random() * (containerHeight - ballSize);
+            
+            // 计算移动时间 (速度越快时间越短)
+            const moveDuration = 1000 / ballSpeed;
+            
+            ball.style.transition = `left ${moveDuration}ms ease-out, top ${moveDuration}ms ease-out`;
+            ball.style.left = newX + 'px';
+            ball.style.top = newY + 'px';
+            
+            // 随机颜色变化
+            if (Math.random() > 0.7) {
+                const hue = Math.floor(Math.random() * 360);
+                ball.style.background = `radial-gradient(circle, hsl(${hue}, 100%, 70%), hsl(${hue + 30}, 100%, 85%))`;
+            }
+            
+            // 随机大小变化
+            if (Math.random() > 0.8 && ballSpeed > 1.5) {
+                ballSize = 50 + Math.random() * 50;
+                ball.style.width = ballSize + 'px';
+                ball.style.height = ballSize + 'px';
+            }
+            
+            // 设置下次移动
+            setTimeout(moveBall, moveDuration + 200);
+        }
+
+        // 创建点击粒子效果
+        function createParticles(x, y) {
+            for (let i = 0; i < 12; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // 随机颜色
+                const hue = (Math.random() * 60 + 180) % 360;
+                particle.style.background = `hsl(${hue}, 100%, 70%)`;
+                
+                // 初始位置
+                particle.style.left = (x - 4) + 'px';
+                particle.style.top = (y - 4) + 'px';
+                
+                // 随机运动
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 30 + Math.random() * 50;
+                const duration = 500 + Math.random() * 1000;
+                
+                particle.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+                particle.style.opacity = '1';
+                particle.style.transition = `transform ${duration}ms ease-out, opacity ${duration}ms ease-out`;
+                
+                gameContainer.appendChild(particle);
+                
+                // 动画结束后移除
+                setTimeout(() => {
+                    particle.style.opacity = '0';
+                    setTimeout(() => {
+                        particle.remove();
+                    }, duration);
+                }, 50);
+            }
+        }
+
+        // 计时器
+        function startTimer() {
+            clearInterval(countdown);
+            countdown = setInterval(() => {
+                time--;
+                timeLeft.style.width = (time / 30 * 100) + '%';
+                
+                // 每5秒增加难度
+                if (time % 5 === 0 && time < 25) {
+                    ballSpeed += 0.3;
+                }
+                
+                if (time <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        // 更新段位显示
+        function updateRank() {
+            let currentRank = ranks[0];
+            for (const rank of ranks) {
+                if (score >= rank.score) {
+                    currentRank = rank;
+                }
+            }
+            rankDisplay.textContent = currentRank.name;
+            rankDisplay.style.color = currentRank.color;
+        }
+
+        // 结束游戏
+        function endGame() {
+            isPlaying = false;
+            clearInterval(countdown);
+            ball.style.display = 'none';
+            
+            // 显示最终结果
+            startPanel.style.display = 'flex';
+            document.getElementById('gameTitle').textContent = `最终得分: ${score}`;
+            startBtn.textContent = '再玩一次';
+            
+            // 移除所有粒子
+            document.querySelectorAll('.particle').forEach(p => p.remove());
+        }
+
+        // 点击球球
+        ball.addEventListener('click', function(e) {
+            if (!isPlaying) return;
+            
+            score++;
+            scoreDisplay.textContent = score;
+            
+            // 创建粒子效果
+            const rect = ball.getBoundingClientRect();
+            createParticles(rect.left + ballSize/2, rect.top + ballSize/2);
+            
+            // 点击反馈
+            ball.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                ball.style.transform = 'scale(1)';
+            }, 100);
+            
+            // 每10分略微增加难度
+            if (score % 10 === 0) {
+                ballSpeed += 0.1;
+            }
+            
+            updateRank();
+        });
+
+        // 触摸支持
+        ball.addEventListener('touchstart', function(e) {
+            if (!isPlaying) return;
+            e.preventDefault();
+            
+            score++;
+            scoreDisplay.textContent = score;
+            
+            const touch = e.touches[0];
+            const rect = ball.getBoundingClientRect();
+            createParticles(rect.left + ballSize/2, rect.top + ballSize/2);
+            
+            ball.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                ball.style.transform = 'scale(1)';
+            }, 100);
+            
+            if (score % 10 === 0) {
+                ballSpeed += 0.1;
+            }
+            
+            updateRank();
+        });
+
+        // 开始游戏
+        startBtn.addEventListener('click', function() {
+            zenMode = false;
+            startPanel.style.display = 'none';
+            isPlaying = true;
+            initGame();
+        });
+
+        // 禅意模式
+        zenBtn.addEventListener('click', function() {
+            zenMode = true;
+            startPanel.style.display = 'none';
+            isPlaying = true;
+            initGame();
+        });
+
+        // 防止触摸滚动
+        document.addEventListener('touchmove', function(e) {
+            if (isPlaying) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
